@@ -7,36 +7,48 @@ The EverDrive N8 Pro comes with a USB port for software development and system u
 - [Current Functionality](#current-functionality)
 - [Change Log](#change-log)
 
-# Current Functionality
+## Current Functionality
 
-*Note: while this tool aims to eventually implement all functionality from edlink, it currently only supports a very small subset*
-
-| Name | Description |
-| --- | --- |
-| print config | retrieve and print the config data |
-
-Currently, this means you only print the following data (values may differ):
+*Note: this tool is still largely untested!*
 
 ```
-mapper.....22 sub.0
-prg size....32K
-chr size....32K 
-srm size....8K 
-master vol..128
-mirroring...h
-cfg bits....00000000
-menu key....0xFF
-save key....0x00
-load key....0x00
-rst delay...no
-save state..yes
-ss button...yes
-unlock......yes
-ctrl bits...10011110
-CFG0: 166202800000009e
-CFG1: ffffffffffffffff
+Usage of goedlink:
+
+goedlink -d <device> [command]
+
+Commands:
+  appmode
+        leave service mode
+  cp --source <source> --destination <destination>
+        copy files, prefix with `sd:` to copy to/from SD card
+  initfpga --path <path>
+        initialize FPGA
+  getrtc
+        get real-time clock
+  loadrom --rom <path_to_rom> [--map <path_to_rom>]
+        load ROM and (optionally) mapper
+  mkdir --path <path> 
+        make directory
+  readmemory --address <address> --length <length> [--path <path_to_file>]
+        read memory standard output or to file
+  reboot
+        send reboot command
+  recovery
+        run EDIO recovery
+  servicemode
+        enter service mode
+  setrtc [--time <time>] 
+        set real-time clock, specify time in format `YYYY-DD-MM HH:mm:SS`, defaults to `now`
+  writeflash --address <address> --length <length> [--path <path_to_file>]
+        write standard input or file to flash
+  writememory --address <address> --length <length> [--path <path_to_file>]
+        write standard input or file to  memory
 ```
 
-# Change Log
+## License
+
+[GNU General Public License, version 2](LICENSE.md)
+
+## Change Log
 
 - `0.1` initial proof-of-concept
