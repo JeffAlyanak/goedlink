@@ -187,7 +187,7 @@ func (n8 *N8) Command(command uint8) {
 // Returns the game index received from the device.
 func (n8 *N8) SelectGame(path string) uint16 {
 	n8.Command(CMD_SELECT_GAME)
-	n8.TxString(path)
+	n8.TxStringFifo(path)
 
 	resp := n8.Rx8()
 	if resp != 0 {

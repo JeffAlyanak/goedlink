@@ -182,6 +182,20 @@ func (n8 *N8) TxString(str string) {
 	n8.TxData(([]uint8)(str))
 }
 
+// TxStringFifo sends string data to the N8 FIFO.
+//
+// First, two bytes are sent indicating the length of the
+// string in bytes. Next, the string itself is transmited.
+func (n8 *N8) TxStringFifo(str string) {
+	data := []byte(str)
+	dataLength := make([]byte, 2)
+
+	binary.LittleEndian.PutUint16(dataLength, uint16(len(data)))
+
+	n8.FifoWr(dataLength, 2)
+	n8.FifoWr(data, (uint32)(len(data)))
+}
+
 // TxDataACK sends data in blocks with acks for each one.
 //
 // Sends data in blocks up to 1024 bytes long, checking the N8 status
