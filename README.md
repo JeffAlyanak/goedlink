@@ -1,6 +1,6 @@
 # goedlink—cross-platform EverDrive N8 Pro serial control software
 
-*Note: this tool is in a very early dev state! Most functionality is working, with the most notable issue being that the "select game" command not working correctly.*
+*Note: this tool is in a very early dev state! Core functionality is working, but this has not been widely tested yet.*
 
 The EverDrive N8 Pro comes with a USB port for software development and system updates over serial, but the client provided by krikzz doesn't play nice with Linux. This tool aims to re-implement the functionality in golang so as to be easily ported to a wide variety of operating systems.
 
@@ -122,6 +122,22 @@ Usage of writememory:
         (required) number of bytes to read (eg. '0x40', '64', etc)
   -path string
         (optional) read data from a file (otherwise data is read from standard input)
+```
+
+## Build
+
+To manually build, ensure you're running a compatible version of golang and run:
+
+```sh
+go mod tidy
+go build -o goedlink-linux-amd64
+```
+
+On macOS, this likely requires `CGO_ENABLED=1`:
+
+```sh
+go mod tidy
+CGO_ENABLED=1 go build -o goedlink-linux-amd64
 ```
 
 ## License

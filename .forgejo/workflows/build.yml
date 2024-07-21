@@ -1,0 +1,66 @@
+name: Test Runner
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: docker
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21.6'
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Install dependencies
+        run: go mod tidy
+
+      - name: make dir
+        run: mkdir release
+
+      # linux builds
+      - name: Build the Linux x86_64 binary
+        run: GOOS=linux GOARCH=amd64 go build -o ./release/goedlink-linux-amd64
+      - name: Upload Linux x86_64 Binary
+        run: |
+          bash .forgejo/workflows/upload_release_asset.sh goedlink-linux-amd64 ./release/goedlink-linux-amd64
+
+      - name: Build the Linux ARM binary
+        run: GOOS=linux GOARCH=arm go build -o ./release/goedlink-linux-arm
+      - name: Upload Linux ARM Binary
+        run: |
+          bash .forgejo/workflows/upload_release_asset.sh goedlink-linux-arm ./release/goedlink-linux-arm
+
+      # windows builds
+      - name: Build the Windows x86_64 binary
+        run: GOOS=windows GOARCH=amd64 go build -o ./release/goedlink-windows-amd64.exe
+      - name: Upload Windows x86_64 Binary
+        run: |
+          bash .forgejo/workflows/upload_release_asset.sh goedlink-windows-amd64.exe ./release/goedlink-windows-amd64.exe
+
+      - name: Build the Windows ARM
+        run: GOOS=windows GOARCH=arm go build -o ./release/goedlink-windows-arm.exe
+      - name: Upload Windows ARM Binary
+        run: |
+          bash .forgejo/workflows/upload_release_asset.sh goedlink-windows-arm.exe ./release/goedlink-windows-arm.exe
+
+      # mac builds annoyingly require CGO, looking into osxcross to automate this
+      # - name: Build the macOS x86_64 binary
+      #   run: GOOS=darwin GOARCH=amd64 go build -o goedlink-macos-amd64
+      # - name: Build macOS ARM binary
+      #   run: GOOS=darwin GOARCH=arm64 go build -o goedlink-macos-arm64
