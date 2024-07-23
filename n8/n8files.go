@@ -152,6 +152,7 @@ func (n8 *N8) GetDirRecords(startIndex uint16, amount uint16, maxNameLength uint
 		}
 		if resp != 0 {
 			err = fmt.Errorf("[GetDirRecords] unknown response code: %04x", resp)
+			return fileInformation, err
 		}
 
 		var fileInfo FileInfo

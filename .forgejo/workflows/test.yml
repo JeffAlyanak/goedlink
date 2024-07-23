@@ -12,6 +12,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: check hostname resolves right
+        run: |
+          apt update && apt install -y iputils-ping && ping -c 1 forge.rights.ninja
+
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
@@ -34,10 +38,11 @@ jobs:
         run: |
           mkdir -p coverage
           go test -v -coverprofile=coverage/coverage.out ./...
-          go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+          go tool cover -func=coverage/coverage.out -o coverage/report
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@v2
+      - name: Add a comment to the pull request
+        uses: https://github.com/peter-evans/create-or-update-comment@v2
         with:
-          name: coverage-report
-          path: coverage/coverage.html
+          token: ${{ secrets.GITHUB_TOKEN }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body-file: coverage/report
