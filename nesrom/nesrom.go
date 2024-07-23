@@ -59,9 +59,10 @@ type NesRom struct {
 // 	SrmSize   int
 // }
 
-func NewNesRom(path string) (*NesRom, error) {
+func NewNesRom(path string) (n *NesRom, err error) {
 	if path == "" {
-		return nil, fmt.Errorf("ROM is not specified")
+		err = fmt.Errorf("[NewNesRom] ROM is not specified")
+		return
 	}
 
 	rom, err := os.ReadFile(path)
@@ -69,7 +70,7 @@ func NewNesRom(path string) (*NesRom, error) {
 		return nil, err
 	}
 
-	n := &NesRom{
+	n = &NesRom{
 		romPath: path,
 		size:    (uint32)(len(rom)),
 		ines:    make([]uint8, 32),
@@ -137,7 +138,8 @@ func NewNesRom(path string) (*NesRom, error) {
 			copy(n.prg[dst:], rom[src:src+block])
 		}
 	default:
-		return nil, fmt.Errorf("unknown ROM format")
+		err = fmt.Errorf("[NewNesRom] unknown ROM format")
+		return
 	}
 
 	crcLen := (uint32)(len(rom)) - n.datBase
@@ -146,7 +148,7 @@ func NewNesRom(path string) (*NesRom, error) {
 	}
 	n.crc = crc32.ChecksumIEEE(rom[n.datBase : n.datBase+crcLen])
 
-	return n, nil
+	return
 }
 
 func (n *NesRom) Print() {

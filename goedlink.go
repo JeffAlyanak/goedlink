@@ -88,7 +88,10 @@ func Info(args []string) {
 		defer N8.Port.Close()
 
 		N8.ExitServiceMode()
-		config := N8.GetConfig()
+		config, err := N8.GetConfig()
+		if err != nil {
+			log.Fatalln(err)
+		}
 		fmt.Println("[Info]")
 		config.PrintFull()
 		os.Exit(0)
@@ -157,7 +160,10 @@ func GetRtc(args []string) {
 		N8.InitSerial(*device, time.Second*2)
 		defer N8.Port.Close()
 
-		rtc := N8.GetRtc()
+		rtc, err := N8.GetRtc()
+		if err != nil {
+			log.Fatalln(err)
+		}
 		rtc.Print()
 		os.Exit(0)
 	}
@@ -193,7 +199,11 @@ func LoadRom(args []string) {
 			N8.LoadGame(*romPath, *mapPath)
 		}
 
-		N8.GetConfig().Print()
+		config, err := N8.GetConfig()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		config.Print()
 		os.Exit(0)
 	}
 

@@ -1,11 +1,59 @@
 # goedlink—cross-platform EverDrive N8 Pro serial control software
 
+![](https://img.shields.io/gitea/v/release/jeff/goedlink?gitea_url=https%3A%2F%2Fforge.rights.ninja)
+
 *Note: this tool is in a very early dev state! Core functionality is working, but this has not been widely tested yet.*
 
 The EverDrive N8 Pro comes with a USB port for software development and system updates over serial, but the client provided by krikzz doesn't play nice with Linux. This tool aims to re-implement the functionality in golang so as to be easily ported to a wide variety of operating systems.
 
+- [Getting Started](#getting-started)
 - [Current Functionality](#current-functionality)
+- [Build](#build)
+- [License](#license)
 - [Change Log](#change-log)
+
+## Getting Started
+
+See [below](#build) for instructions on building or download the latest binary for your OS [here](https://forge.rights.ninja/jeff/goedlink/releases/latest).
+
+Plug in your N8 Pro and identify the serial device (see your OS documentation if you're unsure of how to confirm this).
+
+| OS | Likely device names |
+| --- | --- |
+| Linux | `/dev/ttyACM*`, `/dev/ttyUSB*` |
+| FreeBSD | `/dev/cuaU*`, `/dev/ttyU*` |
+| macOS | `/dev/tty.*`, `/dev/cu.*` |
+| Windows | `COM*` |
+
+You can confirm that everything is working by running the info command:
+
+```sh
+goedlink info -d <device_name>
+```
+
+For example, on linux:
+
+```sh
+$ goedlink-0.1-linux-amd64 info -d /dev/ttyACM0
+[Info]
+ mapper.....255 sub.0
+ prg size....8K
+ chr size....8K 
+ srm size....128B 
+ master vol..0
+ mirroring...h
+ cfg bits....00000000
+ menu key....0x00
+ save key....0x00
+ load key....0x00
+ rst delay...no
+ save state..no
+ ss button...no
+ unlock......yes
+ ctrl bits...10000000
+ CFG0: ff00000000000080
+ CFG1: 0000000000000000
+```
 
 ## Current Functionality
 

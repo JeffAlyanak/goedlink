@@ -3,7 +3,6 @@ package n8
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/tarm/serial"
@@ -81,20 +80,39 @@ const (
 // General Serial
 //
 
+// SerialPortInterface abstracts the serial port to allow for
+// testing with a mock interface.
+type SerialPortInterface interface {
+	Read(p []byte) (n int, err error)
+	Write(p []byte) (n int, err error)
+	Close() (err error)
+}
+
+func (n8 *N8) Read(buf []byte) (bytesRead int, err error) {
+	return n8.Port.Read(buf)
+}
+func (n8 *N8) Write(buf []byte) (bytesWritter int, err error) {
+	return n8.Port.Write(buf)
+}
+func (n8 *N8) Close() (err error) {
+	return n8.Port.Close()
+}
+
 // CloseSerial closes serial connection.
 //
 // Waits 100ms after closing to avoid issues trying to
 // reconnect to quickly.
-func (n8 *N8) CloseSerial() {
-	n8.Port.Close()
+func (n8 *N8) CloseSerial() (err error) {
+	err = n8.Port.Close()
 	time.Sleep(time.Millisecond * 100)
+	return
 }
 
 // InitSerial configures and opens serial connection.
 //
 // Waits 100ms after opening to avoid issues trying to
 // reconnect to quickly.
-func (n8 *N8) InitSerial(device string, timeout time.Duration) {
+func (n8 *N8) InitSerial(device string, timeout time.Duration) (err error) {
 	n8.Address = device
 
 	config := &serial.Config{
@@ -106,13 +124,14 @@ func (n8 *N8) InitSerial(device string, timeout time.Duration) {
 		ReadTimeout: timeout,
 	}
 
-	var err error
 	n8.Port, err = serial.OpenPort(config)
 	if err != nil {
-		log.Fatalf("Failed to open serial port: %v", err)
+		return fmt.Errorf("failed to open serial port: %v", err)
 	}
 
 	time.Sleep(time.Millisecond * 100)
+
+	return nil
 }
 
 //
@@ -120,87 +139,112 @@ func (n8 *N8) InitSerial(device string, timeout time.Duration) {
 //
 
 // TxData sends an arbitrary stream of data to the N8.
-func (n8 *N8) TxData(buf []uint8) {
-	_, err := n8.Port.Write(buf)
-	if err != nil {
-		log.Fatalf("Failed to write to serial port: %v", err)
+func (n8 *N8) TxData(buf []uint8) (err error) {
+	if len(buf) == 0 {
+		return fmt.Errorf("[TxData] no data to write")
 	}
+
+	n, err := n8.Write(buf)
+	if err != nil {
+		return
+	}
+	if n != len(buf) {
+		return fmt.Errorf("[TxData] not all bytes written to serial port: expected %v, wrote %v", len(buf), n)
+	}
+	return nil
 }
 
 // Tx8 sends 8 bits to the N8.
-func (n8 *N8) Tx8(arg uint8) {
+func (n8 *N8) Tx8(arg uint8) (err error) {
 	var buf []uint8 = make([]uint8, 1)
 	buf[0] = (uint8)(arg)
-	n8.TxData(buf)
+
+	return n8.TxData(buf)
 }
 
 // Tx8 sends 16 bits to the N8.
-func (n8 *N8) Tx16(arg uint16) {
+func (n8 *N8) Tx16(arg uint16) (err error) {
 	var buf []uint8 = make([]uint8, 2)
 	binary.LittleEndian.PutUint16(buf[:], arg)
 
-	n8.TxData(buf)
+	return n8.TxData(buf)
 }
 
 // Tx32 sends 32 bits to the N8.
-func (n8 *N8) Tx32(arg uint32) {
+func (n8 *N8) Tx32(arg uint32) (err error) {
 	var buf []uint8 = make([]uint8, 4)
 	binary.LittleEndian.PutUint32(buf[:], arg)
 
-	n8.TxData(buf)
+	return n8.TxData(buf)
 }
 
 // TxCmd sends a serial command to the N8.
 //
 // `n8.TxCmdExec()` is generally called after this to execute the command.
-func (n8 *N8) TxCmd(command uint8) {
+func (n8 *N8) TxCmd(command uint8) (err error) {
 	cmd := make([]uint8, 4)
 	cmd[0] = uint8('+')
 	cmd[1] = uint8('+' ^ 0xff)
 	cmd[2] = command
 	cmd[3] = uint8(command ^ 0xff)
 
-	_, err := n8.Port.Write(cmd)
+	n, err := n8.Write(cmd)
 	if err != nil {
-		log.Fatalf("Failed to write to serial port: %v", err)
+		return
 	}
+	if n != len(cmd) {
+		return fmt.Errorf("[TxData] not all bytes written to serial port: expected %v, wrote %v", len(cmd), n)
+	}
+
+	return nil
 }
 
 // TxCmdExec sends an `EXEC` command to the N8.
 //
 // This is generally used after `n8.TxCmd()`.
-func (n8 *N8) TxCmdExec() {
-	n8.Tx8(CMD_EXEC)
+func (n8 *N8) TxCmdExec() (err error) {
+	return n8.Tx8(CMD_EXEC)
 }
 
 // TxString sends string data to the N8.
 //
 // First, two bytes are sent indicating the length of the
 // string in bytes. Next, the string itself is transmited.
-func (n8 *N8) TxString(str string) {
-	n8.Tx16((uint16)(len(str)))
-	n8.TxData(([]uint8)(str))
+func (n8 *N8) TxString(str string) (err error) {
+	err = n8.Tx16((uint16)(len(str)))
+	if err != nil {
+		return
+	}
+	err = n8.TxData(([]uint8)(str))
+	if err != nil {
+		return
+	}
+
+	return nil
 }
 
 // TxStringFifo sends string data to the N8 FIFO.
 //
 // First, two bytes are sent indicating the length of the
 // string in bytes. Next, the string itself is transmited.
-func (n8 *N8) TxStringFifo(str string) {
+func (n8 *N8) TxStringFifo(str string) (err error) {
 	data := []byte(str)
 	dataLength := make([]byte, 2)
 
 	binary.LittleEndian.PutUint16(dataLength, uint16(len(data)))
 
-	n8.FifoWr(dataLength, 2)
-	n8.FifoWr(data, (uint32)(len(data)))
+	err = n8.FifoWr(dataLength, 2)
+	if err != nil {
+		return
+	}
+	return n8.FifoWr(data, (uint32)(len(data)))
 }
 
 // TxDataACK sends data in blocks with acks for each one.
 //
 // Sends data in blocks up to 1024 bytes long, checking the N8 status
 // after each block is transmitted.
-func (n8 *N8) TxDataACK(buf []uint8, length uint32) {
+func (n8 *N8) TxDataACK(buf []uint8, length uint32) (err error) {
 	var offset uint32 = 0
 	var block uint32 = ACK_BLOCK_SIZE
 
@@ -209,17 +253,21 @@ func (n8 *N8) TxDataACK(buf []uint8, length uint32) {
 			block = length
 		}
 
-		resp := n8.Rx8()
-		if resp != 0 {
-
-			log.Fatalf("[TxDataACK] bad ack: %02x", resp)
+		resp, err := n8.Rx8()
+		if err != nil || resp != 0 {
+			return fmt.Errorf("[TxDataACK] bad ack: %02x", resp)
 		}
 
-		n8.TxData(buf[offset : offset+block])
+		err = n8.TxData(buf[offset : offset+block])
+		if err != nil {
+			return err
+		}
 
 		length -= block
 		offset += block
 	}
+
+	return nil
 }
 
 //
@@ -229,55 +277,107 @@ func (n8 *N8) TxDataACK(buf []uint8, length uint32) {
 // RxData reads data from the serial port into the provided buffer.
 //
 // It reads one uint8 at a time as reading too quickly causes issues.
-func (n8 *N8) RxData(buf []uint8) {
+func (n8 *N8) RxData(buf []uint8) (err error) {
+	var bytesRead int
 	for remaining := len(buf); remaining > 0; {
 		tinyBuf := make([]uint8, 1)
 
-		n8.Port.Read(tinyBuf)
+		n, err := n8.Read(tinyBuf)
+		if err != nil || n != 1 {
+			return err
+		}
+
 		copy(buf[len(buf)-remaining:], tinyBuf)
 
+		bytesRead++
 		remaining--
 	}
+
+	if bytesRead != len(buf) {
+		return fmt.Errorf("[TxData] not all bytes read from serial port: expected %v, read %v", len(buf), bytesRead)
+	}
+
+	return nil
 }
 
 // Rx8 reads 8 bits from the N8.
-func (n8 *N8) Rx8() uint8 {
+func (n8 *N8) Rx8() (resp uint8, err error) {
 	buf := make([]uint8, 1)
-	n8.RxData(buf)
+	err = n8.RxData(buf)
+	if err != nil {
+		return
+	}
 
-	return (uint8)(buf[0])
+	return (uint8)(buf[0]), nil
 }
 
 // Rx16 reads 16 bits from the N8.
-func (n8 *N8) Rx16() uint16 {
+func (n8 *N8) Rx16() (resp uint16, err error) {
 	buf := make([]uint8, 2)
-	n8.RxData(buf)
+	err = n8.RxData(buf)
+	if err != nil {
+		return
+	}
 
-	return binary.LittleEndian.Uint16(buf)
+	return binary.LittleEndian.Uint16(buf), nil
 }
 
 // Rx32 reads 32 bits from the N8.
-func (n8 *N8) Rx32() uint32 {
+func (n8 *N8) Rx32() (resp uint32, err error) {
 	buf := make([]uint8, 4)
-	n8.RxData(buf)
+	err = n8.RxData(buf)
+	if err != nil {
+		return
+	}
 
-	return binary.LittleEndian.Uint32(buf)
+	return binary.LittleEndian.Uint32(buf), nil
 }
 
 // RxString reads string data from the N8.
 //
 // First, two bytes are received indicating the length of the
 // string in bytes. Next, the string itself is read.
-func (n8 *N8) RxString() string {
-	len := n8.Rx16()
+func (n8 *N8) RxString() (resp string, err error) {
+	len, err := n8.Rx16()
+	if err != nil {
+		return
+	}
+
 	buf := make([]uint8, len)
-	n8.RxData(buf)
-	return string(buf)
+
+	err = n8.RxData(buf)
+	if err != nil {
+		return
+	}
+
+	return string(buf), nil
 }
 
 // RxFileInfo reads serialized FileInfo data from the N8.
-func (n8 *N8) RxFileInfo() (uint32, uint16, uint16, uint8, string) {
-	return n8.Rx32(), n8.Rx16(), n8.Rx16(), n8.Rx8(), n8.RxString()
+func (n8 *N8) RxFileInfo() (size uint32, date uint16, time uint16, attributes uint8, name string, err error) {
+
+	size, err = n8.Rx32()
+	if err != nil {
+		return
+	}
+	date, err = n8.Rx16()
+	if err != nil {
+		return
+	}
+	time, err = n8.Rx16()
+	if err != nil {
+		return
+	}
+	attributes, err = n8.Rx8()
+	if err != nil {
+		return
+	}
+	name, err = n8.RxString()
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 //
@@ -288,25 +388,32 @@ func (n8 *N8) RxFileInfo() (uint32, uint16, uint16, uint8, string) {
 //
 // The high nibble should be 0xa5 if the status code was received
 // successfully. The low nibble indicates the status.
-func (n8 *N8) GetStatus() (bool, uint16) {
+func (n8 *N8) GetStatus() (isOkay bool, statusCode uint16, err error) {
 	n8.TxCmd(CMD_STATUS)
-	resp := n8.Rx16()
-
-	if (resp & 0xff00) != 0xa500 { // high nibble should be a5
-		return false, resp
+	resp, err := n8.Rx16()
+	if err != nil {
+		return
 	}
 
-	return true, resp & 0x00ff // low nibble returned as status code
+	if (resp & 0xff00) != 0xa500 { // high nibble should be a5
+		err = fmt.Errorf("[GetStatus] response %04x not a valid status code", resp)
+		return false, resp, err
+	}
+
+	return true, resp & 0x00ff, nil // low nibble returned as status code
 }
 
 // IsStatusOkay checks status code returned by the N8.
 //
 // A code of `0` is Ok. Other codes indicate specific errors.
-func (n8 *N8) IsStatusOkay() (bool, uint16) {
-	ok, resp := n8.GetStatus()
+func (n8 *N8) IsStatusOkay() (isOkay bool, statusCode uint16, err error) {
+	ok, status, err := n8.GetStatus()
+	if err != nil {
+		return
+	}
 	if !ok {
-		fmt.Printf("[isStatusOkay] could not read status: %04x\n", resp)
+		fmt.Printf("[isStatusOkay] status is not okay: %04x\n", status)
 	}
 
-	return resp == 0, resp
+	return status == 0, status, nil
 }

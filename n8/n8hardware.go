@@ -3,15 +3,12 @@ package n8
 import (
 	"encoding/binary"
 	"fmt"
-	"log"
 	"time"
-
-	"github.com/tarm/serial"
 )
 
 type N8 struct {
 	Address string
-	Port    *serial.Port
+	Port    SerialPortInterface
 }
 
 //
@@ -28,18 +25,19 @@ type Vdc struct {
 }
 
 // NewVdc creates a new Vdc struct from the given data.
-func NewVdc(data []uint8) *Vdc {
+func NewVdc(data []uint8) (v *Vdc, err error) {
 	if len(data) != VDC_DATA_SIZE {
-		log.Fatalf("[NewVdc] invalid data length, expected 8, got %d", len(data))
-
+		err = fmt.Errorf("[NewVdc] invalid data length, expected 8, got %d", len(data))
+		return
 	}
 
-	return &Vdc{
+	v = &Vdc{
 		V50: binary.LittleEndian.Uint16(data[0:2]),
 		V25: binary.LittleEndian.Uint16(data[2:4]),
 		V12: binary.LittleEndian.Uint16(data[4:6]),
 		Vbt: binary.LittleEndian.Uint16(data[6:8]),
 	}
+	return
 }
 
 //
@@ -88,13 +86,12 @@ func NewRtcTime(dt time.Time) *RtcTime {
 }
 
 // NewRtcTimeFromSerial returns new RtcTime from serialized RTC data.
-func NewRtcTimeFromSerial(data []uint8) *RtcTime {
+func NewRtcTimeFromSerial(data []uint8) (time *RtcTime, err error) {
 	if len(data) != RTC_DATA_SIZE {
-		log.Fatalf("[NewRtcTimeFromSerial] invalid data length, expected 8, got %d", len(data))
-
+		err = fmt.Errorf("[NewRtcTimeFromSerial] invalid data length, expected 8, got %d", len(data))
 	}
 
-	return &RtcTime{
+	time = &RtcTime{
 		Year:   data[0],
 		Month:  data[1],
 		Day:    data[2],
@@ -102,6 +99,7 @@ func NewRtcTimeFromSerial(data []uint8) *RtcTime {
 		Minute: data[4],
 		Second: data[5],
 	}
+	return
 }
 
 //

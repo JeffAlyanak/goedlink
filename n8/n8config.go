@@ -93,6 +93,7 @@ func NewMapConfigFromBinary(data []uint8) *MapConfig {
 	c.serialConfig = buf
 
 	c.Parse()
+
 	return &c
 }
 
@@ -109,8 +110,8 @@ func NewMapConfig() *MapConfig {
 }
 
 // NewConfigFromNesRom returns a MapConfig for a given NesRom
-func NewConfigFromNesRom(rom *nesrom.NesRom) *MapConfig {
-	c := NewMapConfig()
+func NewConfigFromNesRom(rom *nesrom.NesRom) (c *MapConfig) {
+	c = NewMapConfig()
 	c.MapIndex = rom.GetMapper()
 
 	switch rom.GetMirroring() {
@@ -223,14 +224,14 @@ func (config *MapConfig) Print() {
 // Misc
 //
 
-func boolToYesNo(b bool) string {
+func boolToYesNo(b bool) (str string) {
 	if b {
 		return "yes"
 	}
 	return "no"
 }
 
-func getMask(base uint32, size uint32) uint8 {
+func getMask(base uint32, size uint32) (mask uint8) {
 	var msk byte = 0
 	for (base<<msk) < size && msk < 15 {
 		msk++
