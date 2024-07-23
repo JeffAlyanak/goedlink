@@ -40,9 +40,13 @@ jobs:
           go test -v -coverprofile=coverage/coverage.out ./...
           go tool cover -func=coverage/coverage.out -o coverage/report
 
+      - name: Format test as table
+        run: |
+          bash .forgejo/workflows/make_test_coverage_markdown_table.sh 
+
       - name: Add a comment to the pull request
         uses: https://github.com/peter-evans/create-or-update-comment@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           issue-number: ${{ github.event.pull_request.number }}
-          body-file: coverage/report
+          body-file: coverage/report.md
