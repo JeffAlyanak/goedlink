@@ -240,11 +240,11 @@ func (n8 *N8) TxStringFifo(str string) (err error) {
 	return n8.FifoWr(data, (uint32)(len(data)))
 }
 
-// TxDataACK sends data in blocks with acks for each one.
+// TxDataAck sends data in blocks with acks for each one.
 //
 // Sends data in blocks up to 1024 bytes long, checking the N8 status
 // after each block is transmitted.
-func (n8 *N8) TxDataACK(buf []uint8, length uint32) (err error) {
+func (n8 *N8) TxDataAck(buf []uint8, length uint32) (err error) {
 	var offset uint32 = 0
 	var block uint32 = ACK_BLOCK_SIZE
 
@@ -255,9 +255,8 @@ func (n8 *N8) TxDataACK(buf []uint8, length uint32) (err error) {
 
 		resp, err := n8.Rx8()
 		if err != nil || resp != 0 {
-			return fmt.Errorf("[TxDataACK] bad ack: %02x", resp)
+			return fmt.Errorf("[TxDataAck] bad ack: %02x", resp)
 		}
-
 		err = n8.TxData(buf[offset : offset+block])
 		if err != nil {
 			return err

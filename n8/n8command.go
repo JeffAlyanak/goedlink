@@ -937,7 +937,7 @@ func (n8 *N8) WriteFlash(addr uint32, buf []uint8, length uint32) (err error) {
 	if err != nil {
 		return
 	}
-	err = n8.TxDataACK(buf, length)
+	err = n8.TxDataAck(buf, length)
 	if err != nil {
 		return
 	}
@@ -1022,7 +1022,7 @@ func (n8 *N8) FpgaInit(buf []uint8, config *MapConfig) (err error) {
 	if err != nil {
 		return
 	}
-	err = n8.TxDataACK(buf, uint32(len(buf)))
+	err = n8.TxDataAck(buf, uint32(len(buf)))
 	if err != nil {
 		return
 	}

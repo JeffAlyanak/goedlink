@@ -442,7 +442,7 @@ func (n8 *N8) FileWrite(buf []uint8, length uint32) (err error) {
 	if err != nil {
 		return
 	}
-	err = n8.TxDataACK(buf, length)
+	err = n8.TxDataAck(buf, length)
 	if err != nil {
 		return
 	}
