@@ -20,14 +20,16 @@ type MockSerialPort struct {
 var MOCK_ERR error = fmt.Errorf("mock error")
 
 func (m *MockSerialPort) Read(buf []byte) (n int, err error) {
-	copy(buf, m.testDataRead)
+	copy(buf, m.testDataRead[:len(buf)])
+	m.testDataRead = m.testDataRead[len(buf):]
 
 	m.currentCall++
+
 	if m.currentCall == m.failAtCall {
 
 		return m.serialBytes[m.currentCall-1], m.err
 	}
-
+	fmt.Println(">>", m.serialBytes[m.currentCall-1])
 	return m.serialBytes[m.currentCall-1], nil
 }
 
@@ -85,7 +87,7 @@ func TestCloseSerial(t *testing.T) {
 func TestBasicSerialRead(t *testing.T) {
 	// test setup
 	var buf []uint8 = make([]uint8, 3)
-	testData := []byte{0x01, 0x02, 0x03}
+	testData := []byte{0x01, 0x02, 0x03, 0x01, 0x02, 0x03}
 
 	mockPort := &MockSerialPort{
 		testDataRead: testData,
@@ -390,5 +392,84 @@ func TestTxDataAck(t *testing.T) {
 				return
 			}
 		})
+	}
+}
+
+func TestRxData(t *testing.T) {
+	tests := []struct {
+		name             string
+		serialFailAtCall int
+		mockError        error
+		serialBytes      []int
+		dataRead         []byte
+		wantErr          bool
+	}{
+		{"good read", 0, nil, []int{1, 1, 1}, []byte{0, 0, 0}, false},
+		{"serial error", 1, MOCK_ERR, []int{1, 1, 1}, []byte{0, 0, 0}, true},
+		{"byte fails to read", 0, nil, []int{1, 1, 0}, []byte{0, 0, 0}, true},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			// setup mock serial port
+			mockPort := &MockSerialPort{
+				failAtCall:   test.serialFailAtCall,
+				err:          test.mockError,
+				serialBytes:  test.serialBytes,
+				testDataRead: test.dataRead,
+			}
+			n8 := &N8{
+				Port: mockPort,
+			}
+			buf := make([]uint8, len(test.dataRead))
+
+			// function under test
+			err := n8.RxData(buf)
+
+			// test errors
+			if (err != nil) != test.wantErr {
+				t.Errorf("TxString() error = %v, wantErr %v", err, test.wantErr)
+				return
+			}
+		})
+	}
+}
+
+func TestRx16(t *testing.T) {
+
+	mockPort := &MockSerialPort{
+		serialBytes:  []int{1, 1},
+		testDataRead: []uint8{0x01, 0x02},
+	}
+	n8 := &N8{
+		Port: mockPort,
+	}
+
+	got, err := n8.Rx16()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if got != 0x0201 {
+		t.Errorf("TestRx16() = %04x, want %04x", got, 0x0201)
+	}
+}
+
+func TestRx32(t *testing.T) {
+
+	mockPort := &MockSerialPort{
+		serialBytes:  []int{1, 1, 1, 1},
+		testDataRead: []uint8{0x01, 0x02, 0x03, 0x04},
+	}
+	n8 := &N8{
+		Port: mockPort,
+	}
+
+	got, err := n8.Rx32()
+	if err != nil {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if got != 0x04030201 {
+		t.Errorf("TestRx16() = %04x, want %04x", got, 0x04030201)
 	}
 }
