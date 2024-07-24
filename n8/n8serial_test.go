@@ -18,13 +18,12 @@ type MockSerialPort struct {
 	err         error
 }
 
+var MOCK_ERR error = fmt.Errorf("mock error")
+
 func (m *MockSerialPort) Read(buf []byte) (n int, err error) {
 	copy(buf, m.testDataOut)
 
 	m.currentCall++
-
-	fmt.Println(">>>>", m.currentCall, m.failAtCall)
-
 	if m.currentCall == m.failAtCall {
 
 		return m.bytesOut[m.currentCall-1], m.err
@@ -143,54 +142,41 @@ func TestBasicSerialWrite(t *testing.T) {
 }
 
 func TestTxData(t *testing.T) {
-
-	// Test a valid write of 3 bytes
-	goodWriteBuf := []uint8{0x01, 0x02, 0x03}
-	mockPort := &MockSerialPort{
-		bytesIn: []int{len(goodWriteBuf)}}
-	n8 := &N8{
-		Port: mockPort,
+	tests := []struct {
+		name             string
+		testBuf          []uint8
+		serialFailAtCall int
+		mockError        error
+		bytesIn          []int
+		wantErr          bool
+	}{
+		{"good input", []uint8{0x01, 0x02, 0x03}, 0, nil, []int{3}, false},
+		{"no input", nil, 0, nil, []int{3}, true},
+		{"not all bytes written", []uint8{0x01, 0x02, 0x03}, 0, nil, []int{2}, true},
+		{"serial error", []uint8{0x01, 0x02, 0x03}, 1, MOCK_ERR, []int{3}, true},
 	}
 
-	err := n8.TxData(goodWriteBuf)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if !reflect.DeepEqual(mockPort.testDataIn, goodWriteBuf) {
-		t.Errorf("testData and buf are not equal: %v != %v", mockPort.testDataIn, goodWriteBuf)
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 
-	// Test handling of error from serial port
-	mockPort.currentCall = 0
-	mockPort.failAtCall = 1
-	mockPort.err = fmt.Errorf("mock error")
+			// setup mock serial port
+			mockPort := &MockSerialPort{
+				failAtCall: test.serialFailAtCall,
+				err:        test.mockError,
+				bytesIn:    test.bytesIn}
+			n8 := &N8{
+				Port: mockPort,
+			}
 
-	err = n8.TxData(goodWriteBuf)
-	if err == nil {
-		t.Errorf("expected an error")
-	}
+			// function under test
+			err := n8.TxData(test.testBuf)
 
-	// Test a valid write of 3 bytes with mismatch in bytes written into the port
-	mockPort.currentCall = 0
-	mockPort.failAtCall = 0
-	mockPort.bytesIn = []int{0}
-
-	err = n8.TxData(goodWriteBuf)
-	if err == nil {
-		t.Errorf("expected an error")
-	}
-
-	// Test an invalid write of 0 bytes
-	var badWriteBuf []uint8
-	mockPort = &MockSerialPort{
-		bytesIn: []int{len(badWriteBuf)}}
-	n8 = &N8{
-		Port: mockPort,
-	}
-
-	err = n8.TxData(badWriteBuf)
-	if err == nil {
-		t.Error("expected an error with bad data, but got none")
+			// test errors
+			if (err != nil) != test.wantErr {
+				t.Errorf("TxString() error = %v, wantErr %v", err, test.wantErr)
+				return
+			}
+		})
 	}
 }
 
@@ -240,40 +226,41 @@ func TestTx32(t *testing.T) {
 }
 
 func TestTxCmd(t *testing.T) {
-	cmd := CMD_DISK_INIT
-
-	mockPort := &MockSerialPort{
-		bytesIn: []int{4}}
-	n8 := &N8{
-		Port: mockPort,
+	tests := []struct {
+		name             string
+		testCmd          uint8
+		serialFailAtCall int
+		mockError        error
+		bytesIn          []int
+		wantErr          bool
+	}{
+		{"good input", CMD_DISK_INIT, 0, nil, []int{4}, false},
+		{"not all bytes written", CMD_DISK_INIT, 0, nil, []int{2}, true},
+		{"serial error", CMD_DISK_INIT, 1, MOCK_ERR, []int{4}, true},
 	}
 
-	// test known good command write
-	err := n8.TxCmd(cmd)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			// setup mock serial port
+			mockPort := &MockSerialPort{
+				failAtCall: test.serialFailAtCall,
+				err:        test.mockError,
+				bytesIn:    test.bytesIn}
+			n8 := &N8{
+				Port: mockPort,
+			}
+
+			// function under test
+			err := n8.TxCmd(test.testCmd)
+
+			// test errors
+			if (err != nil) != test.wantErr {
+				t.Errorf("TxString() error = %v, wantErr %v", err, test.wantErr)
+				return
+			}
+		})
 	}
-
-	// Test handling of error from serial port
-	mockPort.currentCall = 0
-	mockPort.failAtCall = 1
-	mockPort.err = fmt.Errorf("mock error")
-	err = n8.TxCmd(cmd)
-	if err == nil {
-		t.Errorf("expected an error")
-	}
-
-	// Test a valid command but with unexpected number of bytes written
-	mockPort.currentCall = 0
-	mockPort.failAtCall = 0
-	mockPort.bytesIn = []int{2}
-	mockPort.err = nil
-
-	err = n8.TxCmd(cmd)
-	if err == nil {
-		t.Errorf("expected an error")
-	}
-
 }
 
 func TestTxCmdExec(t *testing.T) {
@@ -291,18 +278,75 @@ func TestTxCmdExec(t *testing.T) {
 }
 
 func TestTxString(t *testing.T) {
-	testString := "whee"
-
-	mockPort := &MockSerialPort{
-		bytesIn: []int{2, 4}}
-	n8 := &N8{
-		Port: mockPort,
+	tests := []struct {
+		name             string
+		testString       string
+		serialFailAtCall int
+		bytesIn          []int
+		wantErr          bool
+	}{
+		{"good input", "validstring", 0, []int{2, 11}, false},
+		{"bad length on first call", "validstring", 0, []int{1, 11}, true},
+		{"bad length on second call", "validstring", 0, []int{2, 2}, true},
 	}
 
-	// test with known good value
-	err := n8.TxString(testString)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			// setup mock serial port
+			mockPort := &MockSerialPort{
+				failAtCall: test.serialFailAtCall,
+				bytesIn:    test.bytesIn}
+			n8 := &N8{
+				Port: mockPort,
+			}
+
+			// function under test
+			err := n8.TxString(test.testString)
+
+			// test errors
+			if (err != nil) != test.wantErr {
+				t.Errorf("TxString() error = %v, wantErr %v", err, test.wantErr)
+				return
+			}
+		})
+	}
+}
+
+func TestTxStringFifo(t *testing.T) {
+	tests := []struct {
+		name             string
+		testString       string
+		serialFailAtCall int
+		mockError        error
+		bytesIn          []int
+		wantErr          bool
+	}{
+		{"good input", "valid", 0, nil, []int{4, 4, 4, 1, 2, 4, 4, 4, 1, 5}, false},
+		{"not all bytes written when sending length", "valid", 0, nil, []int{4, 4, 4, 1, 0, 4, 4, 4, 1, 5}, true},
+		{"not all bytes written when sending string", "valid", 0, nil, []int{4, 4, 4, 1, 2, 4, 4, 4, 1, 0}, true},
 	}
 
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			// setup mock serial port
+			mockPort := &MockSerialPort{
+				failAtCall: test.serialFailAtCall,
+				err:        test.mockError,
+				bytesIn:    test.bytesIn}
+			n8 := &N8{
+				Port: mockPort,
+			}
+
+			// function under test
+			err := n8.TxStringFifo(test.testString)
+
+			// test errors
+			if (err != nil) != test.wantErr {
+				t.Errorf("TxString() error = %v, wantErr %v", err, test.wantErr)
+				return
+			}
+		})
+	}
 }
