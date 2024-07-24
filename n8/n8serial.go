@@ -282,13 +282,16 @@ func (n8 *N8) RxData(buf []uint8) (err error) {
 		tinyBuf := make([]uint8, 1)
 
 		n, err := n8.Read(tinyBuf)
-		if err != nil || n != 1 {
+		if err != nil {
 			return err
+		}
+		if n != 1 {
+			break
 		}
 
 		copy(buf[len(buf)-remaining:], tinyBuf)
 
-		bytesRead++
+		bytesRead += n
 		remaining--
 	}
 
