@@ -296,7 +296,7 @@ func (n8 *N8) RxData(buf []uint8) (err error) {
 	}
 
 	if bytesRead != len(buf) {
-		return fmt.Errorf("[TxData] not all bytes read from serial port: expected %v, read %v", len(buf), bytesRead)
+		return fmt.Errorf("[RxData] not all bytes read from serial port: expected %v, read %v", len(buf), bytesRead)
 	}
 
 	return nil
@@ -340,12 +340,17 @@ func (n8 *N8) Rx32() (resp uint32, err error) {
 // First, two bytes are received indicating the length of the
 // string in bytes. Next, the string itself is read.
 func (n8 *N8) RxString() (resp string, err error) {
-	len, err := n8.Rx16()
+	length, err := n8.Rx16()
 	if err != nil {
 		return
 	}
 
-	buf := make([]uint8, len)
+	if length == 0 {
+		err = fmt.Errorf("[RxString] string length of 0 is invalid")
+		return
+	}
+
+	buf := make([]uint8, length)
 
 	err = n8.RxData(buf)
 	if err != nil {
@@ -391,7 +396,11 @@ func (n8 *N8) RxFileInfo() (size uint32, date uint16, time uint16, attributes ui
 // The high nibble should be 0xa5 if the status code was received
 // successfully. The low nibble indicates the status.
 func (n8 *N8) GetStatus() (isOkay bool, statusCode uint16, err error) {
-	n8.TxCmd(CMD_STATUS)
+	err = n8.TxCmd(CMD_STATUS)
+	if err != nil {
+		return
+	}
+
 	resp, err := n8.Rx16()
 	if err != nil {
 		return

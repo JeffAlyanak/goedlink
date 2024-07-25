@@ -2,7 +2,6 @@ package n8
 
 import (
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 )
@@ -29,7 +28,7 @@ func (m *MockSerialPort) Read(buf []byte) (n int, err error) {
 
 		return m.serialBytes[m.currentCall-1], m.err
 	}
-	fmt.Println(">>", m.serialBytes[m.currentCall-1])
+
 	return m.serialBytes[m.currentCall-1], nil
 }
 
@@ -55,10 +54,10 @@ func TestInitSerial(t *testing.T) {
 	n8 := &N8{}
 	err := n8.InitSerial(testDeviceName, time.Second)
 	if n8.Address != testDeviceName {
-		t.Errorf("Expected address to be '%s', got '%s'", testDeviceName, n8.Address)
+		t.Errorf("InitSerial() error: expected address to be '%s', got '%s'", testDeviceName, n8.Address)
 	}
 	if err == nil {
-		t.Errorf("error expected")
+		t.Errorf("Close() error = %v, wantErr True", err)
 	}
 
 }
@@ -73,72 +72,109 @@ func TestCloseSerial(t *testing.T) {
 		Port:    mockPort,
 	}
 
-	err := n8.Close()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	t.Run("test close", func(t *testing.T) {
+		err := n8.Close()
+		if err != nil {
+			t.Errorf("Close() error = %v", err)
+		}
+	})
 
-	err = n8.CloseSerial()
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
+	t.Run("test closeserial", func(t *testing.T) {
+		err := n8.CloseSerial()
+		if err != nil {
+			t.Errorf("CloseSerial() error = %v", err)
+
+		}
+	})
 }
 
 func TestBasicSerialRead(t *testing.T) {
-	// test setup
-	var buf []uint8 = make([]uint8, 3)
-	testData := []byte{0x01, 0x02, 0x03, 0x01, 0x02, 0x03}
-
-	mockPort := &MockSerialPort{
-		testDataRead: testData,
-		serialBytes:  []int{len(testData)},
-	}
-	n8 := &N8{
-		Port: mockPort,
-	}
-
-	//
-	n, err := n8.Read(buf)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if n != len(buf) {
-		t.Errorf("bytes read/write doesn't match length of data: %v != %v", n, len(buf))
+	tests := []struct {
+		name             string
+		buf              []uint8
+		serialFailAtCall int
+		mockError        error
+		serialBytes      []int
+		dataRead         []byte
+		wantErr          bool
+		wantReturn       int
+	}{
+		{"good input", []uint8{1, 2, 3}, 0, nil, []int{1, 3}, []byte{0}, false, 3},
+		{"serial read error", []uint8{1, 2, 3}, 1, MOCK_ERR, []int{1, 3}, []byte{0}, true, 3},
 	}
 
-	//
-	mockPort.currentCall = 0
-	n, err = n8.Port.Read(buf)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if n != len(buf) {
-		t.Errorf("bytes read/write doesn't match length of data: %v != %v", n, len(buf))
-	}
-	if !reflect.DeepEqual(testData, buf) {
-		t.Errorf("testData and read buf are not equal: %v != %v", testData, buf)
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			// setup mock serial port
+			mockPort := &MockSerialPort{
+				testDataRead: test.buf,
+				serialBytes:  []int{len(test.buf)},
+				failAtCall:   test.serialFailAtCall,
+				err:          test.mockError,
+			}
+			n8 := &N8{
+				Port: mockPort,
+			}
+
+			// function under test
+			got, err := n8.Read(test.buf)
+
+			// test errors and return
+			if (err != nil) != test.wantErr {
+				t.Errorf("Read() error = %v, wantErr %v", err, test.wantErr)
+				return
+			} else if err == nil {
+				if got != test.wantReturn {
+					t.Errorf("Read() = %04x, want %04x", got, test.wantReturn)
+				}
+			}
+		})
 	}
 }
 
 func TestBasicSerialWrite(t *testing.T) {
-	buf := []uint8{0x01, 0x02, 0x03}
+	tests := []struct {
+		name             string
+		buf              []uint8
+		serialFailAtCall int
+		mockError        error
+		serialBytes      []int
+		dataRead         []byte
+		wantErr          bool
+		wantReturn       int
+	}{
+		{"good input", []uint8{1, 2, 3}, 0, nil, []int{1, 3}, []byte{0}, false, 3},
+		{"serial read error", []uint8{1, 2, 3}, 1, MOCK_ERR, []int{1, 3}, []byte{0}, true, 3},
+	}
 
-	mockPort := &MockSerialPort{
-		serialBytes: []int{len(buf)},
-	}
-	n8 := &N8{
-		Port: mockPort,
-	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 
-	n, err := n8.Port.Write(buf)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-	if n != len(buf) {
-		t.Errorf("bytes read/write doesn't match length of data: %v != %v", n, len(buf))
-	}
-	if !reflect.DeepEqual(mockPort.testDataWrite, buf) {
-		t.Errorf("testData and buf are not equal: %v != %v", mockPort.testDataWrite, buf)
+			// setup mock serial port
+			mockPort := &MockSerialPort{
+				testDataRead: test.buf,
+				serialBytes:  []int{len(test.buf)},
+				failAtCall:   test.serialFailAtCall,
+				err:          test.mockError,
+			}
+			n8 := &N8{
+				Port: mockPort,
+			}
+
+			// function under test
+			got, err := n8.Write(test.buf)
+
+			// test errors and return
+			if (err != nil) != test.wantErr {
+				t.Errorf("Write() error = %v, wantErr %v", err, test.wantErr)
+				return
+			} else if err == nil {
+				if got != test.wantReturn {
+					t.Errorf("Write() = %04x, want %04x", got, test.wantReturn)
+				}
+			}
+		})
 	}
 }
 
@@ -174,7 +210,7 @@ func TestTxData(t *testing.T) {
 
 			// test errors
 			if (err != nil) != test.wantErr {
-				t.Errorf("TxString() error = %v, wantErr %v", err, test.wantErr)
+				t.Errorf("TxData() error = %v, wantErr %v", err, test.wantErr)
 				return
 			}
 		})
@@ -192,7 +228,7 @@ func TestTx8(t *testing.T) {
 
 	err := n8.Tx8(data)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Errorf("Tx8() error = %v", err)
 	}
 }
 
@@ -207,7 +243,7 @@ func TestTx16(t *testing.T) {
 
 	err := n8.Tx16(data)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Errorf("Tx16() error = %v", err)
 	}
 }
 
@@ -222,7 +258,7 @@ func TestTx32(t *testing.T) {
 
 	err := n8.Tx32(data)
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Errorf("Tx32() error = %v", err)
 	}
 }
 
@@ -257,7 +293,7 @@ func TestTxCmd(t *testing.T) {
 
 			// test errors
 			if (err != nil) != test.wantErr {
-				t.Errorf("TxString() error = %v, wantErr %v", err, test.wantErr)
+				t.Errorf("TxCmd() error = %v, wantErr %v", err, test.wantErr)
 				return
 			}
 		})
@@ -273,7 +309,7 @@ func TestTxCmdExec(t *testing.T) {
 
 	err := n8.TxCmdExec()
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Errorf("TxCmdExec() error = %v", err)
 	}
 
 }
@@ -345,7 +381,7 @@ func TestTxStringFifo(t *testing.T) {
 
 			// test errors
 			if (err != nil) != test.wantErr {
-				t.Errorf("TxString() error = %v, wantErr %v", err, test.wantErr)
+				t.Errorf("TxStringFifo() error = %v, wantErr %v", err, test.wantErr)
 				return
 			}
 		})
@@ -388,7 +424,7 @@ func TestTxDataAck(t *testing.T) {
 
 			// test errors
 			if (err != nil) != test.wantErr {
-				t.Errorf("TxString() error = %v, wantErr %v", err, test.wantErr)
+				t.Errorf("TxDataAck() error = %v, wantErr %v", err, test.wantErr)
 				return
 			}
 		})
@@ -429,7 +465,7 @@ func TestRxData(t *testing.T) {
 
 			// test errors
 			if (err != nil) != test.wantErr {
-				t.Errorf("TxString() error = %v, wantErr %v", err, test.wantErr)
+				t.Errorf("RxData() error = %v, wantErr %v", err, test.wantErr)
 				return
 			}
 		})
@@ -448,10 +484,10 @@ func TestRx16(t *testing.T) {
 
 	got, err := n8.Rx16()
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Errorf("Rx16() error = %v, wantErr True", err)
 	}
 	if got != 0x0201 {
-		t.Errorf("TestRx16() = %04x, want %04x", got, 0x0201)
+		t.Errorf("Rx16() = %04x, want %04x", got, 0x0201)
 	}
 }
 
@@ -467,9 +503,322 @@ func TestRx32(t *testing.T) {
 
 	got, err := n8.Rx32()
 	if err != nil {
-		t.Errorf("unexpected error: %v", err)
+		t.Errorf("Rx32() error = %v, wantErr True", err)
 	}
 	if got != 0x04030201 {
-		t.Errorf("TestRx16() = %04x, want %04x", got, 0x04030201)
+		t.Errorf("Rx32() = %04x, want %04x", got, 0x04030201)
+	}
+}
+
+func TestRxString(t *testing.T) {
+	tests := []struct {
+		name             string
+		testDataRead     []uint8
+		serialFailAtCall int
+		testError        error
+		serialBytes      []int
+		wantErr          bool
+		wantReturn       string
+	}{
+		{"good input", []uint8{4, 0, (uint8)('t'), (uint8)('e'), (uint8)('s'), (uint8)('t')}, 0, nil, []int{1, 1, 1, 1, 1, 1}, false, "test"},
+		{"length is 0", []uint8{0, 0}, 0, nil, []int{1, 1}, true, "false"},
+		{"serial fail on first read", []uint8{4, 0, (uint8)('t'), (uint8)('e'), (uint8)('s'), (uint8)('t')}, 1, MOCK_ERR, []int{1, 1, 1, 1, 1, 1}, true, "test"},
+		{"serial fail on second read", []uint8{4, 0, (uint8)('t'), (uint8)('e'), (uint8)('s'), (uint8)('t')}, 2, MOCK_ERR, []int{1, 1, 1, 1, 1, 1}, true, "test"},
+		{"serial fail on third read", []uint8{4, 0, (uint8)('t'), (uint8)('e'), (uint8)('s'), (uint8)('t')}, 3, MOCK_ERR, []int{1, 1, 1, 1, 1, 1}, true, "test"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			// setup mock serial port
+			mockPort := &MockSerialPort{
+				failAtCall:   test.serialFailAtCall,
+				serialBytes:  test.serialBytes,
+				testDataRead: test.testDataRead,
+				err:          test.testError,
+			}
+			n8 := &N8{
+				Port: mockPort,
+			}
+
+			// function under test
+			got, err := n8.RxString()
+
+			// test errors and return
+			if (err != nil) != test.wantErr {
+				t.Errorf("TxString() error = %v, wantErr %v", err, test.wantErr)
+				return
+			} else if err == nil {
+				if got != test.wantReturn {
+					t.Errorf("Read() = %s, want %s", got, test.wantReturn)
+				}
+			}
+		})
+	}
+}
+
+func TestRxFileInfo(t *testing.T) {
+	tests := []struct {
+		name                 string
+		testDataRead         []uint8
+		serialFailAtCall     int
+		testError            error
+		serialBytes          []int
+		wantErr              bool
+		wantReturnSize       uint32
+		wantReturnDate       uint16
+		wantReturnTime       uint16
+		wantReturnAttributes uint8
+		wantReturnName       string
+	}{
+		{"good input", []uint8{
+			0x01,
+			0x02,
+			0x03,
+			0x04,
+			0x05,
+			0x06,
+			0x07,
+			0x08,
+			0x09,
+			0x04,
+			0x00,
+			uint8('t'),
+			uint8('e'),
+			uint8('s'),
+			uint8('t'),
+		},
+			0,
+			nil,
+			[]int{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+			false,
+			0x04030201,
+			0x0605,
+			0x0807,
+			0x09,
+			"test"},
+		{"serial fail on first read", []uint8{
+			0x01,
+			0x02,
+			0x03,
+			0x04,
+			0x05,
+			0x06,
+			0x07,
+			0x08,
+			0x09,
+			0x04,
+			0x00,
+			uint8('t'),
+			uint8('e'),
+			uint8('s'),
+			uint8('t'),
+		},
+			1,
+			MOCK_ERR,
+			[]int{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+			true,
+			0x04030201,
+			0x0605,
+			0x0807,
+			0x09,
+			"test"},
+		{"serial fail on fifth read", []uint8{
+			0x01,
+			0x02,
+			0x03,
+			0x04,
+			0x05,
+			0x06,
+			0x07,
+			0x08,
+			0x09,
+			0x04,
+			0x00,
+			uint8('t'),
+			uint8('e'),
+			uint8('s'),
+			uint8('t'),
+		},
+			5,
+			MOCK_ERR,
+			[]int{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+			true,
+			0x04030201,
+			0x0605,
+			0x0807,
+			0x09,
+			"test"},
+		{"serial fail on seventh read", []uint8{
+			0x01,
+			0x02,
+			0x03,
+			0x04,
+			0x05,
+			0x06,
+			0x07,
+			0x08,
+			0x09,
+			0x04,
+			0x00,
+			uint8('t'),
+			uint8('e'),
+			uint8('s'),
+			uint8('t'),
+		},
+			7,
+			MOCK_ERR,
+			[]int{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+			true,
+			0x04030201,
+			0x0605,
+			0x0807,
+			0x09,
+			"test"},
+		{"serial fail on ninth read", []uint8{
+			0x01,
+			0x02,
+			0x03,
+			0x04,
+			0x05,
+			0x06,
+			0x07,
+			0x08,
+			0x09,
+			0x04,
+			0x00,
+			uint8('t'),
+			uint8('e'),
+			uint8('s'),
+			uint8('t'),
+		},
+			9,
+			MOCK_ERR,
+			[]int{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+			true,
+			0x04030201,
+			0x0605,
+			0x0807,
+			0x09,
+			"test"},
+		{"serial fail on tenth read", []uint8{
+			0x01,
+			0x02,
+			0x03,
+			0x04,
+			0x05,
+			0x06,
+			0x07,
+			0x08,
+			0x09,
+			0x04,
+			0x00,
+			uint8('t'),
+			uint8('e'),
+			uint8('s'),
+			uint8('t'),
+		},
+			10,
+			MOCK_ERR,
+			[]int{1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
+			true,
+			0x04030201,
+			0x0605,
+			0x0807,
+			0x09,
+			"test"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			// setup mock serial port
+			mockPort := &MockSerialPort{
+				failAtCall:   test.serialFailAtCall,
+				serialBytes:  test.serialBytes,
+				testDataRead: test.testDataRead,
+				err:          test.testError,
+			}
+			n8 := &N8{
+				Port: mockPort,
+			}
+
+			// function under test
+			size, date, time, attributes, name, err := n8.RxFileInfo()
+
+			// test errors and return
+			if (err != nil) != test.wantErr {
+				t.Errorf("TxString() error = %v, wantErr %v", err, test.wantErr)
+				return
+			} else if err == nil {
+				if size != test.wantReturnSize ||
+					date != test.wantReturnDate ||
+					time != test.wantReturnTime ||
+					attributes != test.wantReturnAttributes ||
+					name != test.wantReturnName {
+					t.Errorf("TxString() = (%x, %x, %x, %x, %s), want (%x, %x, %x, %x, %s)",
+						size,
+						date,
+						time,
+						attributes,
+						name,
+						test.wantReturnSize,
+						test.wantReturnDate,
+						test.wantReturnTime,
+						test.wantReturnAttributes,
+						test.wantReturnName,
+					)
+				}
+			}
+		})
+	}
+}
+
+func TestGetStatus(t *testing.T) {
+	tests := []struct {
+		name             string
+		serialFailAtCall int
+		mockError        error
+		serialBytes      []int
+		dataRead         []byte
+		wantErr          bool
+		wantReturnOk     bool
+		wantReturnStatus uint16
+	}{
+		{"good read", 0, nil, []int{4, 1, 1}, []byte{0xff, 0xa5}, false, true, 0x00ff},
+		{"fail first serial write", 1, MOCK_ERR, []int{4, 1, 1}, []byte{0xff, 0xa5}, true, true, 0x00ff},
+		{"fail first serial read", 2, MOCK_ERR, []int{4, 1, 1}, []byte{0xff, 0xa5}, true, true, 0x00ff},
+		{"invalid status code", 0, nil, []int{4, 1, 1}, []byte{0xff, 0xff}, true, true, 0x00ff},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			// setup mock serial port
+			mockPort := &MockSerialPort{
+				failAtCall:   test.serialFailAtCall,
+				err:          test.mockError,
+				serialBytes:  test.serialBytes,
+				testDataRead: test.dataRead,
+			}
+			n8 := &N8{
+				Port: mockPort,
+			}
+
+			// function under test
+			ok, status, err := n8.GetStatus()
+
+			// test errors
+			if (err != nil) != test.wantErr {
+				t.Errorf("GetStatus() error = %v, wantErr %v", err, test.wantErr)
+				return
+			} else if err == nil {
+				if !ok || status != test.wantReturnStatus {
+					t.Errorf("GetStatus() = (%v, %04x), want (%v, %04x)", ok, status, test.wantReturnOk, test.wantReturnStatus)
+				}
+
+			}
+
+		})
 	}
 }
