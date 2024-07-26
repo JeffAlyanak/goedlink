@@ -27,7 +27,7 @@ type Vdc struct {
 // NewVdc creates a new Vdc struct from the given data.
 func NewVdc(data []uint8) (v *Vdc, err error) {
 	if len(data) != VDC_DATA_SIZE {
-		err = fmt.Errorf("[NewVdc] invalid data length, expected 8, got %d", len(data))
+		err = fmt.Errorf("[NewVdc] invalid data length, expected %d, got %d", VDC_DATA_SIZE, len(data))
 		return
 	}
 
@@ -88,7 +88,8 @@ func NewRtcTime(dt time.Time) *RtcTime {
 // NewRtcTimeFromSerial returns new RtcTime from serialized RTC data.
 func NewRtcTimeFromSerial(data []uint8) (time *RtcTime, err error) {
 	if len(data) != RTC_DATA_SIZE {
-		err = fmt.Errorf("[NewRtcTimeFromSerial] invalid data length, expected 8, got %d", len(data))
+		err = fmt.Errorf("[NewRtcTimeFromSerial] invalid data length, expected %d, got %d", RTC_DATA_SIZE, len(data))
+		return
 	}
 
 	time = &RtcTime{
