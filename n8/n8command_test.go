@@ -77,7 +77,7 @@ func TestGetConfig(t *testing.T) {
 			MOCK_ERR,
 			[]int{4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1},
 			mockConfig.GetSerialConfig(),
-			false,
+			true,
 			mockConfig.GetSerialConfig(),
 		},
 	}
