@@ -277,6 +277,7 @@ func (n8 *N8) TxDataAck(buf []uint8, length uint32) (err error) {
 //
 // It reads one uint8 at a time as reading too quickly causes issues.
 func (n8 *N8) RxData(buf []uint8) (err error) {
+
 	var bytesRead int
 	for remaining := len(buf); remaining > 0; {
 		tinyBuf := make([]uint8, 1)
