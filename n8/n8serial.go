@@ -254,7 +254,10 @@ func (n8 *N8) TxDataAck(buf []uint8, length uint32) (err error) {
 		}
 
 		resp, err := n8.Rx8()
-		if err != nil || resp != 0 {
+		if err != nil {
+			return err
+		}
+		if resp != 0 {
 			return fmt.Errorf("[TxDataAck] bad ack: %02x", resp)
 		}
 		err = n8.TxData(buf[offset : offset+block])
